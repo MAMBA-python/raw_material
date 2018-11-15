@@ -18,140 +18,61 @@ def create_mf_model(workspace, modelname,
                     top, botm,
                     start_date, end_date, steady_start_period=True,
                     xul=0, yul=0,
-                    strt=0, fixed_head_edge_layers=[],
+                    strt=0, fixed_head_bound_layers=[],
                     tran=[], vcont=[],
                     hy=1, laycon=[], sf1=0.15,
-                    riv_spd={},
-                    recharge_stn=344, start_step=1, steady_start_recharge=0.0007, create_daily_average_rch=False,
-                    average_rch_start=None, average_rch_end=None
                     ):
-    """
-    Create a 2D groundwater flow model.
-
-    Parameters
-    ----------
-    workspace: str
-        model workspace
-
-    modelname: str
-        name of the model
-
-    nlay: int
-        number of model layers
-
-    nrow: int
-        number of model rows
-
-    ncol: int
-        number of model columns
-
-    delc: int, float or list
-        width of columns
-
-    delr: int, float or list
-        widht of rows
-
-    top: int, float, list or array
-        top of the top model layer
-
-    botm: int, float, list or array
-        bottom of the model cells per layer
-
-    start_date: datetime.datetime
-        start date of the modelling period
-
-    end_date: datetime.datetime
-        end date of the modelling period
-
-    steady_start_period: boolean (optional, default True)
-        indicates if a steady state start up period is used in the model
-
-    xul: int or float (optional, default 0)
-        x coordinate of the upper left corner of the model
-
-    yul: int or float (optional, default 0)
-        y coordinate of the upper right corner of the model
-
-    strt: int, float, list or array (optional, default 0)
-        starting head
-
-    fixed_head_edge_layers: list (optional, default [])
-        layers in which a fixed head is added to the left and right edges of the model
-
-    tran: list or array (optional, default [])
-        transmissivity per layer, read if laycon of the layer is 3
-
-    vcont: list or array (optional, default [])
-        vertical conductance of layers
-
-    hy: list or array (optional, default 1)
-        horizontal conductance per layer, read if laycon is 1
-
-    laycon: list or array (optional, default [])
-        type of layer, 1 for unconfined, 3 for confined
-
-    sf1: int, float, list or array (optional, default 0.15)
-        storage coefficient of unconfined layers
-
-    riv_spd: dictionary (optional, default {})
-        river stress period data
-
-    recharge_stn: int (optional, default 344)
-        knmi station name, 344 is Rotterdam
-
-    start_step: int (optional, default 1)
-        start step of the recharge spd
-
-    steady_start_recharge: int or float (optional, default 0.0007)
-        value of the steady state recharge in the first time step. Only used if steady_start_period is True
-
-    create_daily_average_rch: boolean (optional, default False)
-        indicates if the recharge should be converted to a daily average
-
-    average_rch_start: datetime.datetime (optional, default None)
-        start date of the complete period used to average the recharge only used if create_daily_average_rch is True
-
-    average_rch_end: datetime.datetime (optional, default None)
-        end date of the complete period used to average the recharge only used if create_daily_average_rch is True
-
-    Returns
-    -------
-    ml: floyp.modflow.mf.Modflow
-        handle for the modflow model
-
-    """
+    # construct model with flopy
     ml = flopy.modflow.Modflow(modelname=modelname, model_ws=workspace)
 
+    # time discretization
     nper = (end_date - start_date).days
     steady = [False] * nper
 
     if steady_start_period:
         nper += 1
-        start_step += 1
         steady = [True] + steady
 
+    # create discretization package
     dis = flopy.modflow.ModflowDis(ml, nlay=nlay, nrow=nrow, ncol=ncol,
                                    delr=delr, delc=delc, top=top, botm=botm,
                                    xul=xul, yul=yul,
                                    nper=nper, steady=steady, start_datetime=start_date
                                    )
 
+    # create start and boundary conditions package
     ibound = np.ones_like(dis.botm.array)
-    for lay in fixed_head_edge_layers:
+    for lay in fixed_head_bound_layers:
         ibound[lay, 0, 0] = -1
         ibound[lay, 0, -1] = -1
 
     flopy.modflow.ModflowBas(ml, ibound=ibound, strt=strt)
-    flopy.modflow.ModflowBcf(ml, vcont=vcont, tran=tran, hy=hy, laycon=laycon, sf1=sf1)
-    flopy.modflow.ModflowRiv(ml, stress_period_data=riv_spd)
 
+    # create soil characteristics package
+    flopy.modflow.ModflowBcf(ml, vcont=vcont, tran=tran, hy=hy, laycon=laycon, sf1=sf1)
+
+    # create output control package
+    flopy.modflow.ModflowOc(ml, stress_period_data=None)
+
+    # create solver package
+    flopy.modflow.ModflowPcg(ml)
+
+    return ml
+
+
+def add_recharge_knmi(ml, start_date=None, end_date=None, recharge_stn=344,
+                      start_step=1, steady_start_recharge=0.0007, steady_start_period=True,
+                      create_daily_average_rch=False,
+                      average_rch_start=None, average_rch_end=None):
+
+    # create recharge (evaporation and precipitation) package
     if create_daily_average_rch:
         knmi_meteo = ps.read.KnmiStation.download(start=average_rch_start - dt.timedelta(1), end=average_rch_end,
                                                   stns=recharge_stn)
         recharge_all = knmi_meteo.data.RH - knmi_meteo.data.EV24
         recharge = recharge_all.groupby([recharge_all.index.month, recharge_all.index.day]).mean()
     else:
-        knmi_meteo = ps.read.KnmiStation.download(start=start_date-dt.timedelta(1), end=end_date, stns=recharge_stn)
+        knmi_meteo = ps.read.KnmiStation.download(start=start_date - dt.timedelta(1), end=end_date, stns=recharge_stn)
         recharge = knmi_meteo.data.RH - knmi_meteo.data.EV24
 
     rch_spd = recharge_to_spd(recharge, start_step=start_step)
@@ -159,11 +80,8 @@ def create_mf_model(workspace, modelname,
         rch_spd[0] = steady_start_recharge
 
     flopy.modflow.ModflowRch(ml, rech=rch_spd)
-    flopy.modflow.ModflowOc(ml, stress_period_data=None)
-    flopy.modflow.ModflowPcg(ml)
 
     return ml
-
 
 def plot_2d_transmissivity(ml):
     """
