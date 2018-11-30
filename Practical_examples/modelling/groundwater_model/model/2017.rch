@@ -518,3 +518,29 @@ CONSTANT    2.400000E-03                           #rech_257
 CONSTANT    3.400000E-03                           #rech_258                      
          1        -1 # Stress period 259
 CONSTANT    7.200000E-03                           #rech_259                      
+         1        -1 # Stress period 260
+CONSTANT    6.000000E-04                           #rech_260                      
+         1        -1 # Stress period 261
+CONSTANT    1.000000E-04                           #rech_261                      
+         1        -1 # Stress period 262
+CONSTANT    2.100000E-03                           #rech_262                      
+         1        -1 # Stress period 263
+CONSTANT    1.700000E-03                           #rech_263                      
+         1        -1 # Stress period 264
+CONSTANT   -5.000000E-04                           #rech_264                      
+         1        -1 # Stress period 265
+CONSTANT    4.700000E-03                           #rech_265                      
+         1        -1 # Stress period 266
+CONSTANT    1.300000E-03                           #rech_266                      
+         1        -1 # Stress period 267
+CONSTANT    9.600000E-03                           #rech_267                      
+         1        -1 # Stress period 268
+CONSTANT    1.200000E-03                           #rech_268                      
+         1        -1 # Stress period 269
+CONSTANT    8.000000E-04                           #rech_269                      
+         1        -1 # Stress period 270
+CONSTANT    6.000000E-04                           #rech_270                      
+         1        -1 # Stress period 271
+CONSTANT    1.300000E-03                           #rech_271                      
+         1        -1 # Stress period 272
+CONSTANT   -1.000000E-04                           #rech_272                      
